@@ -38,10 +38,12 @@ import sys
 #   删除邮件 (已完成, v1.0.0)
 #   支持更多的附件 3
 #   yaml 配置文件解析 1
+#   /getmail all 输出所有邮件
 #   使用 pprint 输出日志 1
 #   Docker 镜像部署 8 (v1.8.0)
 #   回复邮件 3
 #   修改检查邮箱延时 2
+#   输入错误检查 2
 #   批量删除邮件 4
 #   回复某一条邮件时提供回复、删除按钮 5
 #   对回复邮件的发收件人的格式进行处理，使其可以直接在机器人窗口发信 6
@@ -424,7 +426,7 @@ def replymail(update: Update, context):
     if authForUser(update):
         return
     text = """
-
+暂未支持此功能!
     """
     update.message.reply_text(text=text)
 
@@ -476,6 +478,8 @@ if __name__ == '__main__':
     config = yaml.safe_load(config_file)
     imap_host = config['imap_host']
     smtp_host = config['smtp_host']
+    imap_enable_ssl = config['imap_enable_ssl']
+    smtp_enable_ssl = config['smtp_enable_ssl']
     username = config['username']
     password = config['password']
     mail_box = config['mail_box']
