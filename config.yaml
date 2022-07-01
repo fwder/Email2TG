@@ -1,0 +1,20 @@
+# IMAP 服务器地址
+imap_host: 'imap.example.com'
+# SMTP 服务器地址
+smtp_host: 'smtp.example.com'
+imap_enable_ssl: true
+smtp_enable_ssl: true
+# 邮箱用户名
+username: 'example@exp.com'
+# 邮箱密码或授权码
+password: 'example123456'
+# 邮箱名
+mail_box: 'example@exp.com'
+# 间隔查询邮箱新邮件的秒数 (推荐5s)
+delay_time: 5
+# Telegram Chat ID (使用 @getidsbot 查询 chat_id )
+tg_chat_id: '8888888888'
+# Telegram Bot Token (使用 @BotFather 获取机器人 Token )
+tg_bot_token: '8888888888:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+# 代理设置, 为空则不开启
+proxy_url: 'socks5://127.0.0.1:7890/'
