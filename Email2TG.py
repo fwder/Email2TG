@@ -31,14 +31,11 @@ import sys
 
 
 # TODO v1:
-#   html 转图片发送
-#       使用 API 转换 (√) 7
-#       使用 imgkit 转换 (未使用)
-#       使用 Telegram 自带的 Web Page 显示 (v13.13 暂不支持)
-#   删除邮件 (已完成, v1.0.0)
+#   html 转图片发送 使用 API 转换 7
+#   删除邮件 1 (已完成)
 #   支持更多的附件 3
-#   yaml 配置文件解析 1
-#   /getmail all 输出所有邮件
+#   yaml 配置文件解析 1 (已完成)
+#   /getmail all 输出所有邮件 1
 #   使用 pprint 输出日志 1
 #   Docker 镜像部署 8 (v1.8.0)
 #   回复邮件 3
@@ -85,9 +82,9 @@ class Email2TGUtil:
                 self.smtp = smtplib.SMTP_SSL(host=self.smtp_host, port=465)
             else:
                 self.smtp = smtplib.SMTP_SSL(host=self.smtp_host, port=25)
-            tgprint("邮件服务器已连接")
+            logprint("邮件服务器已连接")
         except:
-            tgprint("邮件服务器连接失败, 请检查服务器配置是否正确")
+            logprint("邮件服务器连接失败, 请检查服务器配置是否正确")
             exit(0)
 
     def login(self, username, password):
@@ -98,7 +95,7 @@ class Email2TGUtil:
             self.imap.login(user=self.username, password=self.password)
             self.smtp.login(user=self.username, password=self.password)
         except:
-            tgprint("邮件服务器登录失败, 请检查账号配置是否正确")
+            mixprint("邮件服务器登录失败, 请检查账号配置是否正确")
             exit(0)
 
     def configure(self, delay_time, tg_chat_id, tg_bot_token):
@@ -115,9 +112,9 @@ class Email2TGUtil:
         msg['To'] = recv_email
         try:
             self.smtp.sendmail(username, recv_email, msg.as_string())
-            tgprint("发送成功")
+            mixprint("发送成功")
         except Exception as e:
-            tgprint("发送失败, 请检查配置")
+            mixprint("发送失败, 请检查配置", 'ERROR')
             print(e)
 
     def send_multipart_mail(self, recv_email, header_text, mail_msg, file_name):
@@ -133,10 +130,10 @@ class Email2TGUtil:
         msg.attach(att1)
         try:
             self.smtp.sendmail(username, recv_email, msg.as_string())
-            tgprint("发送成功")
+            mixprint("发送成功")
         except Exception as e:
-            tgprint("发送失败")
-            tgprint(e)
+            mixprint("发送失败, 错误如下", 'ERROR')
+            mixprint(str(e), 'ERROR')
         os.remove(file_name)
 
     def get_mail(self, mail_len):
@@ -148,14 +145,14 @@ class Email2TGUtil:
             if typ == 'OK':
                 tl = data[0].split()
                 if int(mail_len) > len(tl):
-                    tgprint("无效的输入.\n你的邮箱内邮件数量为" + str(len(tl)) + ", 你想要的太多了.")
+                    mixprint("无效的输入.\n你的邮箱内邮件数量为" + str(len(tl)) + ", 你想要的太多了.", 'ERROR')
                     return
                 for num in tl[len(tl) - int(mail_len):]:
                     typ1, data1 = self.imap.fetch(num, '(RFC822)')  # 读取邮件
                     if typ1 == 'OK':
                         self.output_mail_text(data1, num)
         else:
-            tgprint("邮件服务器连接异常，正在重启 错误代码: 0x00")
+            mixprint("邮件服务器连接异常，正在重启 错误代码: 0x00", 'ERROR')
             restartAuto()
 
     def select_mail(self, mail_index):
@@ -178,7 +175,7 @@ class Email2TGUtil:
             typy, datay = self.imap.search(None, 'ALL')  # 选择全部邮件
             if typy == 'OK':
                 last_new_Email_num = datay[0].split()
-                tgprint("新邮件推送服务已开启, 当有新邮件时会通知您")
+                mixprint("新邮件推送服务已开启, 当有新邮件时会通知您")
                 while True:
                     time.sleep(delay_time)
                     typ, data = self.imap.search(None, 'ALL')
@@ -194,13 +191,13 @@ class Email2TGUtil:
                                     continue
                                 self.output_mail_text(data1, tt[-1])
                     else:
-                        tgprint("邮件服务器连接异常，正在重启 错误代码: 0x01")
+                        mixprint("邮件服务器连接异常，正在重启 错误代码: 0x01", 'ERROR')
                         restartAuto()
             else:
-                tgprint("邮件服务器连接异常，正在重启 错误代码: 0x02")
+                mixprint("邮件服务器连接异常，正在重启 错误代码: 0x02", 'ERROR')
                 restartAuto()
         else:
-            tgprint("邮件服务器连接异常，正在重启 错误代码: 0x03")
+            mixprint("邮件服务器连接异常，正在重启 错误代码: 0x03", 'ERROR')
             restartAuto()
 
     def output_mail_text(self, data, num):
@@ -260,7 +257,8 @@ class Email2TGUtil:
         try:
             tgprint(temp_text)
         except:
-            tgprint(temp_header_text + "\n\n消息发送错误，请检查邮件是否过长")
+            logprint('消息发送错误，请检查邮件是否过长')
+            tgprint(temp_header_text + "\n消息发送错误，请检查邮件是否过长")
 
     def delete_mail(self, mail_index):
         """删除邮件"""
@@ -304,33 +302,32 @@ def getmail(update: Update, context):
         mail_len = update.message['text'].split()[1]
     except:
         e2tUtil.get_mail(1)
-        tgprint("已为您发送最新一条邮件.\n如想查询更多邮件, 请在命令后输入要输出的邮件个数, 例如: /getmail 3")
+        mixprint("已为您发送最新的一条邮件.\n如想查询更多邮件, 请在命令后输入要输出的邮件个数, 例如: /getmail 3")
         return
     if int(mail_len) <= 0:
-        tgprint("无效的输入.")
+        mixprint("无效的输入.", 'ERROR')
         return
     e2tUtil.get_mail(mail_len)
-
 
 
 def sendmail(update: Update, context) -> int:
     if authForUser(update):
         return ConversationHandler.END
-    update.message.reply_text("请输入收件人")
+    mixreplyprint(update, "请输入收件人")
     return 1
 
 
 def sendmail1(update: Update, context) -> int:
     global receive_people
     receive_people = update.message.text
-    update.message.reply_text("请输入邮件主题(标题)")
+    mixreplyprint(update, "请输入邮件主题(标题)")
     return 2
 
 
 def sendmail2(update: Update, context) -> int:
     global header_text
     header_text = update.message.text
-    update.message.reply_text("请输入正文(支持html)")
+    mixreplyprint(update, "请输入正文(支持html)")
     return 3
 
 
@@ -344,28 +341,28 @@ def sendmail3(update: Update, context) -> int:
 def sendmutimail(update: Update, context) -> int:
     if authForUser(update):
         return ConversationHandler.END
-    update.message.reply_text("请输入收件人")
+    mixreplyprint(update, "请输入收件人")
     return 1
 
 
 def sendmutimail1(update: Update, context) -> int:
     global receive_people
     receive_people = update.message.text
-    update.message.reply_text("请输入邮件主题(标题)")
+    mixreplyprint(update, "请输入邮件主题(标题)")
     return 2
 
 
 def sendmutimail2(update: Update, context) -> int:
     global header_text
     header_text = update.message.text
-    update.message.reply_text("请输入正文(支持html)")
+    mixreplyprint(update, "请输入正文(支持html)")
     return 3
 
 
 def sendmutimail3(update: Update, context) -> int:
     global body_text
     body_text = update.message.text
-    update.message.reply_text("请发送需要添加的附件(目前仅支持一个附件)")
+    mixreplyprint(update, "请发送需要添加的附件(目前仅支持一个附件)")
     return 4
 
 
@@ -379,7 +376,7 @@ def sendmutimail4(update: Update, context) -> int:
 def deletemail(update: Update, context) -> int:
     if authForUser(update):
         return ConversationHandler.END
-    update.message.reply_text(text="请输入要删除的邮件编号")
+    mixreplyprint(update, "请输入要删除的邮件编号")
     return 1
 
 
@@ -388,23 +385,23 @@ def deletemail1(update: Update, context) -> int:
     try:
         delete_mail_temp = str(int(update.message.text))
     except:
-        tgprint("输入的值不为数字, 请重新输入正确的邮件编号")
+        mixprint("输入的值不为数字, 请重新输入正确的邮件编号", 'ERROR')
         return 1
-    if e2tUtil.select_mail(delete_mail_temp.encode()) == 1 :
-        tgprint("输入的索引值无法索引到对应邮件, 请重新输入正确的邮件编号")
+    if e2tUtil.select_mail(delete_mail_temp.encode()) == 1:
+        mixprint("输入的索引值无法索引到对应邮件, 请重新输入正确的邮件编号", 'ERROR')
         return 1
-    update.message.reply_text("您确定要删除这个邮件吗？\n输入 /yes 确定删除, 输入其他任意内容取消删除.")
+    mixprint("您确定要删除这个邮件吗？\n输入 /yes 确定删除, 输入其他任意内容取消删除.")
     return 2
 
 
 def deletemail2(update: Update, context) -> int:
     e2tUtil.delete_mail(delete_mail_temp)
-    update.message.reply_text("删除成功")
+    mixreplyprint(update, "删除成功")
     return ConversationHandler.END
 
 
 def cancel(update: Update, context) -> int:
-    update.message.reply_text('您取消了操作')
+    mixreplyprint(update, '您取消了操作')
     return ConversationHandler.END
 
 
@@ -413,14 +410,16 @@ def restart(update: Update, context):
         return
     restartAuto()
 
+
 def restartAuto():
     global e2tUtil
     e2tUtil = Email2TGUtil(imap_host=imap_host, imap_enable_ssl=True, smtp_host=smtp_host, smtp_enable_ssl=True)
     e2tUtil.login(username=username, password=password)
     e2tUtil.configure(delay_time=delay_time, tg_chat_id=tg_chat_id, tg_bot_token=tg_bot_token)
-    tgprint("Email2TG重启成功")
+    mixprint("Email2TG重启成功")
     Thread(target=e2tUtil.check_new_mail).start()
     dispatcher.bot.send_message(chat_id=tg_chat_id, text=start_text)
+
 
 def replymail(update: Update, context):
     if authForUser(update):
@@ -428,33 +427,35 @@ def replymail(update: Update, context):
     text = """
 暂未支持此功能!
     """
-    update.message.reply_text(text=text)
+    mixreplyprint(update, text)
+
 
 def help(update: Update, context):
     if authForUser(update):
         return
-    update.message.reply_text(text=help_text)
+    update.message.reply_text(help_text)
+
+def mixprint(msg, state='INFO', parse_mode=None):
+    print(str(datetime.datetime.now()) + " [" + state + "] " + msg.replace('\n', ' '))
+    dispatcher.bot.send_message(chat_id=tg_chat_id, text=msg, parse_mode=parse_mode)
+
+def mixreplyprint(update, msg, state='INFO', parse_mode=None):
+    print(str(datetime.datetime.now()) + " [" + state + "] " + msg.replace('\n', ' '))
+    update.message.reply_text(text=msg, parse_mode=parse_mode)
 
 
-def tgprint(msg):
-    print(msg)
-    dispatcher.bot.send_message(chat_id=tg_chat_id, text=msg)
+def logprint(msg, state='INFO'):
+    print(str(datetime.datetime.now()) + " [" + state + "] " + msg.replace('\n', ' '))
 
 
-def tgmdprint(msg):
-    print(msg)
-    dispatcher.bot.send_message(chat_id=tg_chat_id, text=msg, parse_mode='Markdown')
-
-
-def tghtmmlprint(msg):
-    print(msg)
-    dispatcher.bot.send_message(chat_id=tg_chat_id, text=msg, parse_mode='HTML')
+def tgprint(msg, parse_mode=None):
+    dispatcher.bot.send_message(chat_id=tg_chat_id, text=msg, parse_mode=parse_mode)
 
 
 def authForUser(update):
     if str(update.message['chat']['id']) != tg_chat_id:
-        update.message.reply_text(text="你未通过验证，无法使用本机器人!")
-        tgmdprint(f"""
+        update.message.reply_text("你未通过验证，无法使用本机器人!")
+        mixprint(f"""
 未验证的用户在未验证的对话中发送了信息.
 
 chat-title: `{update.message['chat']['aaa']}`
@@ -466,15 +467,16 @@ date: {update.message['date']}
 text: `{update.message['text']}`
 
 请管理员悉知！
-        """)
+        """, 'WARN', 'Markdown')
         return True
+    logprint(f"'{update.message.text}' From '{update.message.from_user.username}'", 'RECV')
     return False
 
 
 if __name__ == '__main__':
 
     # 读取配置文件
-    config_file = open('test_config.yaml','r',encoding='utf-8').read()
+    config_file = open('test_config.yaml', 'r', encoding='utf-8').read()
     config = yaml.safe_load(config_file)
     imap_host = config['imap_host']
     smtp_host = config['smtp_host']
@@ -488,7 +490,7 @@ if __name__ == '__main__':
     tg_bot_token = config['tg_bot_token']
     proxy_url = config['proxy_url']
 
-    print("初始化中")
+    logprint("初始化中")
     # 初始化参数
     start_text = """
 欢迎使用 Email2TG 机器人!
@@ -498,15 +500,16 @@ if __name__ == '__main__':
 欢迎使用 Email2TG 机器人!
 
 以下是详细命令列表: 
-1. /start            开始
-2. /info             机器人配置详细信息
-3. /getmail          获取最近的邮件
-4. /sendmail         发送邮件
-5. /sendmutimail     发送带附件的邮件
-6. /deletemail       删除指定邮件 
-7. /replymail        回复邮件
-8. /restart          重启 Email2TG
-9. /cancel           取消当前操作
+/start            开始
+/help             帮助列表
+/getmail          获取最近的邮件
+/sendmail         发送邮件
+/sendmutimail     发送带附件的邮件
+/deletemail       删除指定邮件 
+/replymail        回复邮件
+/info             机器人配置详细信息
+/restart          重启 Email2TG
+/cancel           取消当前操作
         """
     receive_people, header_text, body_text = ('', '', '')
     delete_mail_temp = ''
@@ -553,15 +556,15 @@ if __name__ == '__main__':
     # 提交命令
     commands = [
         ("start", "开始"),
-        ("info", "机器人配置详细信息"),
+        ("help", "帮助列表"),
         ("getmail", "获取最近的邮件"),
         ("sendmail", "发送邮件"),
         ("sendmutimail", "发送带附件的邮件"),
         ("deletemail", "删除指定邮件"),
         ("replymail", "回复邮件"),
+        ("info", "机器人配置详细信息"),
         ("restart", "重启 Email2TG"),
         ("cancel", "取消当前操作"),
-        ("help", "帮助列表")
     ]
     if proxy_url != '':
         proxy = telegram.utils.request.Request(proxy_url=proxy_url.replace('socks5h', 'socks5'))
@@ -570,12 +573,12 @@ if __name__ == '__main__':
         bot = Bot(token=tg_bot_token)
     bot.set_my_commands(commands)
     bot = None
-    tgprint("Telegram 服务器已连接")
+    logprint("Telegram 服务器已连接")
 
     e2tUtil = Email2TGUtil(imap_host=imap_host, imap_enable_ssl=True, smtp_host=smtp_host, smtp_enable_ssl=True)
     e2tUtil.login(username=username, password=password)
     e2tUtil.configure(delay_time=delay_time, tg_chat_id=tg_chat_id, tg_bot_token=tg_bot_token)
-    tgprint("Email2TG启动成功")
+    logprint("Email2TG启动成功")
     Thread(target=e2tUtil.check_new_mail).start()
     dispatcher.bot.send_message(chat_id=tg_chat_id, text=start_text)
     updater.start_polling()
