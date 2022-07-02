@@ -35,8 +35,9 @@ import sys
 #   删除邮件 1 (已完成)
 #   支持更多的附件 3
 #   yaml 配置文件解析 1 (已完成)
-#   /getmail all 输出所有邮件 1
-#   使用 pprint 输出日志 1
+#   /getmail 输出所有邮件 1 (已完成)
+#   /getmail 回答式 1 (已完成)
+#   美化输出日志 1 (已完成)
 #   Docker 镜像部署 8 (v1.8.0)
 #   回复邮件 3
 #   修改检查邮箱延时 2
@@ -144,8 +145,14 @@ class Email2TGUtil:
             typ, data = self.imap.search(None, 'ALL')
             if typ == 'OK':
                 tl = data[0].split()
-                if int(mail_len) > len(tl):
-                    mixprint("无效的输入.\n你的邮箱内邮件数量为" + str(len(tl)) + ", 你想要的太多了.", 'ERROR')
+                try:
+                    if mail_len == 'all':
+                        mail_len = str(len(tl))
+                    elif int(mail_len) > len(tl):
+                        mixprint("无效的输入.\n你的邮箱内邮件数量为" + str(len(tl)) + ", 你想要的太多了.", 'ERROR')
+                        return
+                except:
+                    mixprint('无效的输入.', 'ERROR')
                     return
                 for num in tl[len(tl) - int(mail_len):]:
                     typ1, data1 = self.imap.fetch(num, '(RFC822)')  # 读取邮件
@@ -207,36 +214,44 @@ class Email2TGUtil:
         msgCharset = email.header.decode_header(msg.get('Subject'))[0][1]
         recv_date = email.header.decode_header(msg.get('Date'))[0][0].replace('+00:00', '')
         # 处理内容编码
+        mail_from = ''
+        mail_to = ''
+        subject = ''
         try:
-            mail_from = email.header.decode_header(msg.get('From'))[0][0].decode(
-                msgCharset)
-        except:
             try:
                 mail_from = email.header.decode_header(msg.get('From'))[0][0].decode(
-                    "unicode_escape")
+                    msgCharset)
             except:
-                mail_from = email.header.decode_header(msg.get('From'))[0][0]
-        try:
-            mail_to = email.header.decode_header(msg.get('To'))[0][0].decode(
-                msgCharset)
-        except:
+                try:
+                    mail_from = email.header.decode_header(msg.get('From'))[0][0].decode(
+                        "unicode_escape")
+                except:
+                    mail_from = email.header.decode_header(msg.get('From'))[0][0]
             try:
                 mail_to = email.header.decode_header(msg.get('To'))[0][0].decode(
-                    "unicode_escape")
+                    msgCharset)
             except:
-                mail_to = email.header.decode_header(msg.get('To'))[0][0]
-        try:
-            subject = email.header.decode_header(msg.get('Subject'))[0][0].decode(
-                msgCharset)
-        except:
+                try:
+                    mail_to = email.header.decode_header(msg.get('To'))[0][0].decode(
+                        "unicode_escape")
+                except:
+                    mail_to = email.header.decode_header(msg.get('To'))[0][0]
             try:
                 subject = email.header.decode_header(msg.get('Subject'))[0][0].decode(
-                    "unicode_escape")
+                    msgCharset)
             except:
-                subject = email.header.decode_header(msg.get('Subject'))[0][0]
-        temp_text += "邮件标题: %s\n" % subject
-        temp_text += '发件人: ' + mail_from + '\n收件人: ' + mail_to + '\n接收时间: ' + str(
-            recv_date) + '\n邮件编号: /*' + str(num).replace('b', '').replace('\'', '') + '*/\n\n'
+                try:
+                    subject = email.header.decode_header(msg.get('Subject'))[0][0].decode(
+                        "unicode_escape")
+                except:
+                    subject = email.header.decode_header(msg.get('Subject'))[0][0]
+        except:
+            error_temp_num = str(num).replace('b', '').replace('\'', '')
+            error_temp_msg = f"邮件标题: {subject}\n发件人: {mail_from}\n收件人: {mail_to}\n接收时间: {str(recv_date)}\n邮件编号: /*{error_temp_num}*/\n\n"
+            mixprint(f'{error_temp_msg}无法读取该邮件的信息, 请检查该邮件编码是否为utf-8编码', 'ERROR')
+            return
+        temp_num = str(num).replace('b', '').replace('\'', '')
+        temp_text += f"邮件标题: {subject}\n发件人: {mail_from}\n收件人: {mail_to}\n接收时间: {str(recv_date)}\n邮件编号: /*{temp_num}*/\n\n"
         temp_header_text = temp_text
         for part in msg.walk():
             if not part.is_multipart():
@@ -297,17 +312,18 @@ SMTP 服务器地址: `{smtp_host}`
 
 def getmail(update: Update, context):
     if authForUser(update):
-        return
+        return ConversationHandler.END
+    mixreplyprint(update, '请输入要输出的邮件个数(使用all输出全部邮件)')
+    return 1
+
+
+def getmail1(update: Update, context) -> int:
+    e2tUtil.get_mail(update.message.text)
     try:
-        mail_len = update.message['text'].split()[1]
+        update.message.reply_text(text=f'已输出{str(int(update.message.text))}条邮件.')
     except:
-        e2tUtil.get_mail(1)
-        mixprint("已为您发送最新的一条邮件.\n如想查询更多邮件, 请在命令后输入要输出的邮件个数, 例如: /getmail 3")
-        return
-    if int(mail_len) <= 0:
-        mixprint("无效的输入.", 'ERROR')
-        return
-    e2tUtil.get_mail(mail_len)
+        update.message.reply_text(text=f'已输出全部邮件.')
+    return ConversationHandler.END
 
 
 def sendmail(update: Update, context) -> int:
@@ -435,17 +451,28 @@ def help(update: Update, context):
         return
     update.message.reply_text(help_text)
 
+
 def mixprint(msg, state='INFO', parse_mode=None):
-    print(str(datetime.datetime.now()) + " [" + state + "] " + msg.replace('\n', ' '))
+    logprint(msg, state)
     dispatcher.bot.send_message(chat_id=tg_chat_id, text=msg, parse_mode=parse_mode)
 
+
 def mixreplyprint(update, msg, state='INFO', parse_mode=None):
-    print(str(datetime.datetime.now()) + " [" + state + "] " + msg.replace('\n', ' '))
+    logprint(msg, state)
     update.message.reply_text(text=msg, parse_mode=parse_mode)
 
 
 def logprint(msg, state='INFO'):
-    print(str(datetime.datetime.now()) + " [" + state + "] " + msg.replace('\n', ' '))
+    print_build_msg = f"{str(datetime.datetime.now())} [{state}] " + msg.replace('\n', ' ')
+    if state == 'INFO':
+        print_build_msg = "\033[0;37;40m" + print_build_msg + "\033[0m"
+    elif state == 'WARN':
+        print_build_msg = "\033[0;33;40m" + print_build_msg + "\033[0m"
+    elif state == 'RECV':
+        print_build_msg = "\033[0;34;40m" + print_build_msg + "\033[0m"
+    elif state == 'ERROR':
+        print_build_msg = "\033[0;31;40m" + print_build_msg + "\033[0m"
+    print(print_build_msg)
 
 
 def tgprint(msg, parse_mode=None):
@@ -499,7 +526,7 @@ if __name__ == '__main__':
     help_text = """
 欢迎使用 Email2TG 机器人!
 
-以下是详细命令列表: 
+以下是详细命令列表:  
 /start            开始
 /help             帮助列表
 /getmail          获取最近的邮件
@@ -514,6 +541,7 @@ if __name__ == '__main__':
     receive_people, header_text, body_text = ('', '', '')
     delete_mail_temp = ''
     is_mail_deleted = False
+    get_mail_temp_num = ''
     if proxy_url == '':
         updater = Updater(token=tg_bot_token)
     else:
@@ -522,7 +550,13 @@ if __name__ == '__main__':
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler('start', start))
     dispatcher.add_handler(CommandHandler('info', info))
-    dispatcher.add_handler(CommandHandler('getmail', getmail))
+    dispatcher.add_handler(ConversationHandler(
+        entry_points=[CommandHandler('getmail', getmail)],
+        states={
+            1: [CommandHandler('cancel', cancel), MessageHandler(Filters.text, getmail1)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+    ))
     dispatcher.add_handler(ConversationHandler(
         entry_points=[CommandHandler('sendmail', sendmail)],
         states={
@@ -575,7 +609,8 @@ if __name__ == '__main__':
     bot = None
     logprint("Telegram 服务器已连接")
 
-    e2tUtil = Email2TGUtil(imap_host=imap_host, imap_enable_ssl=True, smtp_host=smtp_host, smtp_enable_ssl=True)
+    e2tUtil = Email2TGUtil(imap_host=imap_host, imap_enable_ssl=imap_enable_ssl, smtp_host=smtp_host,
+                           smtp_enable_ssl=smtp_enable_ssl)
     e2tUtil.login(username=username, password=password)
     e2tUtil.configure(delay_time=delay_time, tg_chat_id=tg_chat_id, tg_bot_token=tg_bot_token)
     logprint("Email2TG启动成功")
